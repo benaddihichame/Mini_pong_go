@@ -34,7 +34,8 @@ type Ball struct {
 }
 
 type Gaming struct {
-	paddle    Paddle
+	paddle1   Paddle
+	paddle2   Paddle
 	ball      Ball
 	score     int
 	bestScore int
@@ -43,9 +44,17 @@ type Gaming struct {
 func main() {
 	ebiten.SetWindowTitle("Pong hichome Go")
 	ebiten.SetWindowSize(screenwidth, screenheight)
-	paddle := Paddle{
+	paddle1 := Paddle{
 		Object: Object{
 			X: 600,
+			Y: 200,
+			W: 15,
+			H: 100,
+		},
+	}
+	paddle2 := Paddle{
+		Object: Object{
+			X: 10,
 			Y: 200,
 			W: 15,
 			H: 100,
@@ -62,8 +71,9 @@ func main() {
 		dydt: ballspeed,
 	}
 	g := &Gaming{
-		paddle: paddle,
-		ball:   ball,
+		paddle1: paddle1,
+		paddle2: paddle2,
+		ball:    ball,
 	}
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
@@ -76,8 +86,12 @@ func (g *Gaming) Layout(outSideWidth, outSideHeight int) (int, int) {
 
 func (g *Gaming) Draw(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen,
-		float32(g.paddle.X), float32(g.paddle.Y),
-		float32(g.paddle.W), float32(g.paddle.H),
+		float32(g.paddle1.X), float32(g.paddle1.Y),
+		float32(g.paddle1.W), float32(g.paddle1.H),
+		color.White, false)
+	vector.DrawFilledRect(screen,
+		float32(g.paddle2.X), float32(g.paddle2.Y),
+		float32(g.paddle2.W), float32(g.paddle2.H),
 		color.White, false)
 	vector.DrawFilledRect(screen,
 		float32(g.ball.X), float32(g.ball.Y),
@@ -91,20 +105,40 @@ func (g *Gaming) Draw(screen *ebiten.Image) {
 }
 
 func (g *Gaming) Update() error {
-	g.paddle.MoveOneKeyPress()
+	g.movePaddles()
 	g.ball.Move()
-	g.CollisionPaddel()
+	g.CollisionPaddle()
 	g.CollisionWall()
 	return nil
 }
 
-func (p *Paddle) MoveOneKeyPress() {
-	if ebiten.IsKeyPressed(ebiten.KeyZ) {
-		p.Object.Y += paddleSpeed
+func (g *Gaming) movePaddles() {
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		g.paddle1.Object.Y -= paddleSpeed
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		p.Object.Y -= paddleSpeed
+		g.paddle1.Object.Y += paddleSpeed
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyJ) {
+		g.paddle2.Object.Y -= paddleSpeed
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyN) {
+		g.paddle2.Object.Y += paddleSpeed
+	}
+
+	// Limiter le mouvement des paddles à l'écran
+	g.paddle1.Object.Y = clamp(g.paddle1.Object.Y, 0, screenheight-g.paddle1.Object.H)
+	g.paddle2.Object.Y = clamp(g.paddle2.Object.Y, 0, screenheight-g.paddle2.Object.H)
+}
+
+func clamp(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func (b *Ball) Move() {
@@ -122,7 +156,7 @@ func (g *Gaming) Reset() {
 
 func (g *Gaming) CollisionWall() {
 	if g.ball.Object.X <= 0 {
-		g.ball.dxdt = ballspeed
+		g.Reset()
 	} else if g.ball.Object.X+g.ball.Object.W >= screenwidth {
 		g.Reset()
 	} else if g.ball.Object.Y <= 0 {
@@ -132,9 +166,16 @@ func (g *Gaming) CollisionWall() {
 	}
 }
 
-func (g *Gaming) CollisionPaddel() {
-	if g.ball.Object.X <= g.paddle.Object.X+g.paddle.Object.W && g.ball.Object.X+g.ball.Object.W >= g.paddle.Object.X && g.ball.Object.Y >= g.paddle.Object.Y && g.ball.Object.Y <= g.paddle.Object.Y+g.paddle.Object.H {
-		g.ball.dxdt = -g.ball.dxdt
+func (g *Gaming) CollisionPaddle() {
+	if g.ball.Object.X <= g.paddle2.Object.X+g.paddle2.Object.W && g.ball.Object.X+g.ball.Object.W >= g.paddle2.Object.X && g.ball.Object.Y+g.ball.Object.H >= g.paddle2.Object.Y && g.ball.Object.Y <= g.paddle2.Object.Y+g.paddle2.Object.H {
+		g.ball.dxdt = ballspeed
+		g.score++
+		if g.score > g.bestScore {
+			g.bestScore = g.score
+		}
+	}
+	if g.ball.Object.X+g.ball.Object.W >= g.paddle1.Object.X && g.ball.Object.X <= g.paddle1.Object.X+g.paddle1.Object.W && g.ball.Object.Y+g.ball.Object.H >= g.paddle1.Object.Y && g.ball.Object.Y <= g.paddle1.Object.Y+g.paddle1.Object.H {
+		g.ball.dxdt = -ballspeed
 		g.score++
 		if g.score > g.bestScore {
 			g.bestScore = g.score
